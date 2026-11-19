@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Library Management System</title>
+<style>
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f7f8ff;color:#111}
+header{background:linear-gradient(90deg,#5b5bd6,#3b2f9e);color:#fff;padding:18px 30px;font-size:26px;font-weight:600}
+main{max-width:1000px;margin:24px auto;padding:0 16px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+h2{margin:0}
+button{border:0;border-radius:6px;padding:8px 14px;color:#fff;cursor:pointer;font-size:14px}
+.blue{background:#1769ff}.orange{background:#ff9f1a}.red{background:#e5243b}.grey{background:#ddd;color:#111}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px #0002}
+th,td{padding:12px 14px;text-align:left;border-bottom:1px solid #eee}
+th{background:#f1f2f8}
+.ok{color:#0a8f3c;font-weight:600}.no{color:#e5243b;font-weight:600}
+.cards{display:flex;gap:16px;margin-top:24px}
+.card{flex:1;background:#eef1ff;border:1px solid #cdd6ff;border-radius:10px;padding:16px}
+.card b{font-size:28px;display:block;margin-top:4px}
+#modal{display:none;position:fixed;inset:0;background:#0006;align-items:center;justify-content:center}
+.box{background:#fff;border-radius:10px;padding:20px;width:340px}
+.box input[type=text]{width:100%;padding:8px;margin:4px 0 12px;box-sizing:border-box}
+.row{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+</style>
+</head>
+<body>
+<header>📖 Library Management System</header>
+<main>
+  <div class="top">
+    <h2>All Books</h2>
+    <button class="blue" onclick="openAdd()">+ Add Book</button>
+  </div>
+  <table>
+    <thead><tr><th>ID</th><th>Title</th><th>Author</th><th>ISBN</th><th>Availability</th><th>Actions</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="cards">
+    <div class="card">Total Books<b id="total">0</b></div>
+    <div class="card">Available Books<b id="avail">0</b></div>
+  </div>
+</main>
+
+<div id="modal">
+  <div class="box">
+    <h3 id="mtitle">Add New Book</h3>
+    <input type="hidden" id="bid">
+    Title<input type="text" id="title">
+    Author<input type="text" id="author">
+    ISBN<input type="text" id="isbn">
+    <label><input type="checkbox" id="available" checked> Available</label>
+    <div class="row">
+      <button class="grey" onclick="closeModal()">Cancel</button>
+      <button class="blue" onclick="save()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/books';
+let books = [];
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function load() {
+  const r = await fetch(API);
+  books = await r.json();
+  render();
+}
+
+function render() {
+  document.getElementById('rows').innerHTML = books.map(b => `
+    <tr>
+      <td>${b.id}</td>
+      <td>${esc(b.title)}</td>
+      <td>${esc(b.author)}</td>
+      <td>${esc(b.isbn)}</td>
+      <td class="${b.available ? 'ok' : 'no'}">${b.available ? '✔ Available' : '✖ Issued'}</td>
+      <td>
+        <button class="blue" onclick="viewBook(${b.id})">View</button>
+        <button class="orange" onclick="openEdit(${b.id})">Edit</button>
+        <button class="red" onclick="delBook(${b.id})">Delete</button>
+      </td>
+    </tr>`).join('');
+  document.getElementById('total').textContent = books.length;
+  document.getElementById('avail').textContent = books.filter(b => b.available).length;
+}
+
+function openAdd() {
+  document.getElementById('mtitle').textContent = 'Add New Book';
+  document.getElementById('bid').value = '';
+  document.getElementById('title').value = '';
+  document.getElementById('author').value = '';
+  document.getElementById('isbn').value = '';
+  document.getElementById('available').checked = true;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function openEdit(id) {
+  const b = books.find(x => x.id === id);
+  document.getElementById('mtitle').textContent = 'Edit Book';
+  document.getElementById('bid').value = b.id;
+  document.getElementById('title').value = b.title || '';
+  document.getElementById('author').value = b.author || '';
+  document.getElementById('isbn').value = b.isbn || '';
+  document.getElementById('available').checked = b.available;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modal').style.display = 'none';
+}
+
+async function save() {
+  const id = document.getElementById('bid').value;
+  const body = {
+    title: document.getElementById('title').value,
+    author: document.getElementById('author').value,
+    isbn: document.getElementById('isbn').value,
+    available: document.getElementById('available').checked
+  };
+  await fetch(id ? API + '/' + id : API, {
+    method: id ? 'PUT' : 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  closeModal();
+  load();
+}
+
+function viewBook(id) {
+  const b = books.find(x => x.id === id);
+  alert('ID: ' + b.id + '\nTitle: ' + b.title + '\nAuthor: ' + b.author +
+        '\nISBN: ' + (b.isbn || '-') + '\nAvailable: ' + (b.available ? 'Yes' : 'No'));
+}
+
+async function delBook(id) {
+  if (!confirm('Delete this book?')) return;
+  await fetch(API + '/' + id, {method: 'DELETE'});
+  load();
+}
+
+load();
+</script>
+</body>
+</html>
